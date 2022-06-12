@@ -1,6 +1,6 @@
 ext {
     PUBLISH_GROUP_ID = 'io.github.yeh35'
-    PUBLISH_VERSION = '0.12.3'
+    PUBLISH_VERSION = '0.12.4'
     PUBLISH_ARTIFACT_ID = 'channel-open-api'
     PUBLISH_DESCRIPTION = 'Channel Talk Open API SDK'
     PUBLISH_URL = 'https://github.com/Yeh35/channel-open-sdk'
