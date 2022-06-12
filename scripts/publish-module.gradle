@@ -1,22 +1,31 @@
 apply plugin: 'maven-publish'
 apply plugin: 'signing'
 
-task androidSourcesJar(type: Jar) {
-    archiveClassifier.set('sources')
-    if (project.plugins.findPlugin("com.android.library")) {
-        // For Android libraries
-        from android.sourceSets.main.java.srcDirs
-        from android.sourceSets.main.kotlin.srcDirs
-    } else {
-        // For pure Kotlin libraries, in case you have them
-        from sourceSets.main.java.srcDirs
-        from sourceSets.main.kotlin.srcDirs
-    }
+//task androidSourcesJar(type: Jar) {
+//    archiveClassifier.set('sources')
+//    if (project.plugins.findPlugin("com.android.library")) {
+//        // For Android libraries
+//        from android.sourceSets.main.java.srcDirs
+//        from android.sourceSets.main.kotlin.srcDirs
+//    } else {
+//        // For pure Kotlin libraries, in case you have them
+//        from sourceSets.main.java.srcDirs
+//        from sourceSets.main.kotlin.srcDirs
+//    }
+//}
+
+task javadocJar(type: Jar) {
+    archiveClassifier.set('javadoc')
+    from javadoc
 }
 
+task sourcesJar(type: Jar) {
+    archiveClassifier.set('sources')
+    from sourceSets.main.allSource
+}
 
 artifacts {
-    archives androidSourcesJar
+    archives javadocJar, sourcesJar
 }
 
 group = PUBLISH_GROUP_ID
@@ -33,13 +42,10 @@ afterEvaluate {
                 version PUBLISH_VERSION
 
                 // Two artifacts, the `aar` (or `jar`) and the sources
-                if (project.plugins.findPlugin("com.android.library")) {
-                    from components.release
-                } else {
-                    artifact("$buildDir/libs/${project.getName()}-${version}.jar")
-                }
+                artifact("$buildDir/libs/${project.getName()}-${version}.jar")
 
-                artifact androidSourcesJar
+                artifact javadocJar
+                artifact sourcesJar
 
                 // Mostly self-explanatory metadata
                 pom {
@@ -76,4 +82,3 @@ afterEvaluate {
 signing {
     sign publishing.publications
 }
-publish-roo

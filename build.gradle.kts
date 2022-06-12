@@ -9,8 +9,9 @@ plugins {
 }
 
 
-apply(from = "${rootDir}/scripts/publish-root.gradle")
 apply(from = "publish.gradle")
+apply(from = "${rootDir}/scripts/publish-root.gradle")
+apply(from = "${rootDir}/scripts/publish-module.gradle")
 
 group = extra["PUBLISH_GROUP_ID"]!!
 version = extra["PUBLISH_VERSION"]!!
