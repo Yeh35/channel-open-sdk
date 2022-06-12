@@ -62,7 +62,7 @@ class KotlinTest {
                 "    \"operator\": true,\n" +
                 "    \"operatorScheduling\": false,\n" +
                 "    \"avatarUrl\": \"https://cf.channel.io/avatar/emoji/koala.f392e0.png\",\n" +
-                "    \"avatarUrl123\": \"https://cf.channel.io/avatar/emoji/koala.f392e0.png\",\n" +
+                "    \"avatarUrl\": \"https://cf.channel.io/avatar/emoji/koala.f392e0.png\",\n" +
                 "    \"managerId\": \"218869\"\n" +
                 "}"
 
@@ -76,7 +76,7 @@ class KotlinTest {
         println(objectMapper.readValue(json, Manager::class.java))
     }
 
-    @Test
+
     fun testTest() {
         val xAccessKey = ""
         val xAccessSecret = ""
