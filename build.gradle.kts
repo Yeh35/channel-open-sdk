@@ -21,8 +21,6 @@ repositories {
     mavenCentral()
 }
 
-
-
 dependencies {
     api("io.projectreactor.netty:reactor-netty:1.0.19")
     api("org.springframework:spring-webflux:5.3.20")
@@ -43,7 +41,7 @@ tasks.withType<KotlinCompile> {
 tasks {
     val fatJar = register<Jar>("fatJar") {
         dependsOn.addAll(listOf("compileJava", "compileKotlin", "processResources")) // We need this for Gradle optimization to work
-//        archiveClassifier.set("standalone") // Naming the jar
+        archiveClassifier.set("standalone") // Naming the jar
         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
         val sourcesMain = sourceSets.main.get()
