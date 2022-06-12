@@ -9,6 +9,7 @@ import com.yeh35.channelopenapi.schma.Scope.MESSAGE_CREATED_USER_CHAT
 import com.yeh35.channelopenapi.schma.block.*
 import org.junit.jupiter.api.Test
 import java.awt.Color
+import java.time.LocalDate
 import kotlin.streams.toList
 
 class KotlinTest {
@@ -76,63 +77,94 @@ class KotlinTest {
         println(objectMapper.readValue(json, Manager::class.java))
     }
 
-
+    @Test
     fun testTest() {
-        val xAccessKey = ""
-        val xAccessSecret = ""
-
+        val xAccessKey = "62a58d04644cae7732be"
+        val xAccessSecret = "2fa881a786cd3c4e9ac886ee74fb6004"
         val channel = Channel.create(xAccessKey, xAccessSecret)
-        val bots = channel.getBots()
+
+        // 등록된 봇 전부 가져오기
+        val sinceToBack = LocalDate.now()
+        val bots = channel.getBots(sinceToBack)
         println("count : ${bots.count()}")
 
-        println(bots[0])
-        val updatedBot = channel.saveBot(bots[0])
+        // 봇 수정하기
+        val bot = bots[0]
+        bot.color = Color.RED
+        val updatedBot = channel.saveBot(bot)
         println("updatedBot : $updatedBot")
 
-        val newBot = channel.saveBot(Bot.create("new Bot", Color.GREEN))
+        // 봇 생성하기
+        val newBot = Bot.create("new Bot", Color.GREEN)
+        channel.saveBot(newBot)
         println("newBot : $newBot")
 
-        val managerAll = channel.getManagerAll()
+        // 봇 삭제하기
+        val isSuccess = channel.deleteBot(newBot)
+        println("deleteResult : $isSuccess")
+
+        // 매니저 전부 가져오기
+        val managerAll = channel.getManagerAll(sinceToBack)
         println("managerAll : $managerAll")
 
+        // ID로 특정 매니저 찾기
         val manager = managerAll[1]
         channel.findByManagerId(manager.id)
 
         val message = Message(
             blocks = listOf(
-                TextBlock("안녕"),
-                TextBlock("안 안녕")
-            )
+                TextBlock("Hi Open API"),
+                CodeBlock("""println("Hi Open API")"""),
+                BulletBlock(
+                    "List",
+                    blocks = listOf(
+                        TextBlock("item 1"),
+                        TextBlock("item 2"),
+                        TextBlock("item 3")
+                    )
+                )
+            ),
+            options = setOf(MessageOption.ACT_AS_MANAGER)
         )
-        channel.sendAnnouncementAll(bot = newBot, message = message)
-        channel.sendAnnouncement(manager = manager, bot = newBot, message = message)
 
+        // 모든 매니저에게 보내기
+        channel.sendAnnouncementAll(bot = bot, message = message)
+
+        // 특정 매니저에게 보내기
+        channel.sendAnnouncement(manager = manager, bot = bot, message = message)
+
+        // 모든 TeamChat 가져오기
         val teamChatAll = channel.getTeamChatAll()
-        println("teamChatAll: $teamChatAll")
+        println("teamChatAll size: ${teamChatAll.size}")
 
+        // 활성화된 TeamChat 필터링하기
         val teamChat = teamChatAll.stream()
             .filter { it.active }
             .toList()[0]
-        channel.sendTeamChat(teamChat, newBot, message = message)
 
+        //특정 TeamChat으로 메시지 보내기
+        channel.sendTeamChat(teamChat = teamChat, bot = bot, message = message)
 
+        // 등록된 Webhook 가져오기
         val webhookAll = channel.getWebhookAll()
-        println("webhookAll: $webhookAll")
+        println("webhookAll Size: ${webhookAll.size}")
 
+        // Webhook 생성하기
         val webhook = Webhook.create(
-            "TestCode",
-            "http://localhost:8080",
-            setOf(MESSAGE_CREATED_TEAM_CHAT, MESSAGE_CREATED_USER_CHAT),
+            name = "TestCode",
+            url = "http://localhost:8080",
+            scopes = setOf(MESSAGE_CREATED_TEAM_CHAT, MESSAGE_CREATED_USER_CHAT),
             keywords = setOf("안녕", "왜 안될까?"),
             apiVersion = ApiVersion.V5,
             blocked = false
         )
-        val saveResult = channel.createWebhook(webhook)
-        println("saveResult: $saveResult")
+        val isSave = channel.createWebhook(webhook)
+        println("saveResult: $isSave")
 
-        channel.deleteWebhook(webhook).let {
-            println("delete WebHook: $it")
-        }
+        // Webhook 삭제하기
+        val isDelete = channel.deleteWebhook(webhook)
+        println("delete WebHook: $isDelete")
+
 
         val deleteResult = channel.deleteBot(newBot)
         println("deleteResult : $deleteResult")
