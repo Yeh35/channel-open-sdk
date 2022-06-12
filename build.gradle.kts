@@ -5,10 +5,15 @@ plugins {
     id("io.spring.dependency-management") version "1.0.11.RELEASE"
     kotlin("jvm") version "1.6.21"
     kotlin("plugin.spring") version "1.6.21"
+    id("io.github.gradle-nexus.publish-plugin") version "1.1.0"
 }
 
-group = "com.yeh35"
-version = "0.12.1-SNAPSHOT"
+
+apply(from = "${rootDir}/scripts/publish-root.gradle")
+apply(from = "publish.gradle")
+
+group = extra["PUBLISH_GROUP_ID"]!!
+version = extra["PUBLISH_VERSION"]!!
 java.sourceCompatibility = JavaVersion.VERSION_11
 
 repositories {
