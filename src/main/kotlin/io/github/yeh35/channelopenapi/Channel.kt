@@ -319,10 +319,20 @@ class Channel private constructor(
      * @since 0.0.1
      */
     fun sendTeamChat(teamChat: TeamChat, bot: Bot, message: Message): Boolean {
+        return sendTeamChat(teamChat.id.toLong(), bot.name, message)
+    }
+
+    /**
+     * TeamChat에 메시지 보내기
+     *
+     * @author sang oh yeh
+     * @since 0.13.1
+     */
+    fun sendTeamChat(teamChatId: Long, botName: String, message: Message): Boolean {
         val result = webClient.post().run {
             this.uri { builder ->
-                builder.replacePath("/open/v5/groups/${teamChat.id}/messages")
-                    .queryParam("botName", bot.name)
+                builder.replacePath("/open/v5/groups/${teamChatId}/messages")
+                    .queryParam("botName", botName)
                     .build()
             }
             this.accept(MediaType.APPLICATION_JSON)
