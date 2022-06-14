@@ -1,10 +1,6 @@
 package io.github.yeh35.channelopenapi.util
 
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.LocalTime
-import java.time.ZoneId
+import java.time.*
 import java.util.*
 
 class DateTimeUtil {
@@ -16,7 +12,7 @@ class DateTimeUtil {
         }
 
         fun localDateTimeToUnixMilli(time: LocalDateTime): Long {
-            return time.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            return time.atOffset(ZoneOffset.UTC).toInstant().toEpochMilli()
         }
 
         fun unixMilliToLocalDateTime(unixMilli: Long): LocalDateTime {
