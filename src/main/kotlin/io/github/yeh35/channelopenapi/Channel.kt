@@ -10,16 +10,16 @@ import io.github.yeh35.channelopenapi.schma.TeamChat
 import io.github.yeh35.channelopenapi.schma.Webhook
 import io.github.yeh35.channelopenapi.schma.block.Message
 import io.github.yeh35.channelopenapi.util.DateTimeUtil
+import io.netty.channel.ChannelException
 import io.netty.channel.ChannelOption
 import io.netty.handler.timeout.ReadTimeoutHandler
 import io.netty.handler.timeout.WriteTimeoutHandler
 import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
 import org.springframework.http.client.reactive.ReactorClientHttpConnector
 import org.springframework.http.codec.json.Jackson2JsonDecoder
 import org.springframework.http.codec.json.Jackson2JsonEncoder
-import org.springframework.web.reactive.function.client.ExchangeStrategies
-import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.bodyToMono
+import org.springframework.web.reactive.function.client.*
 import reactor.core.publisher.Mono
 import reactor.netty.http.client.HttpClient
 import java.nio.charset.StandardCharsets
@@ -39,7 +39,17 @@ class Channel private constructor(
 
     private val webClient: WebClient
 
+    private val objectMapper: ObjectMapper = ObjectMapper()
+        .registerModule(
+            KotlinModule.Builder()
+                .configure(KotlinFeature.NullIsSameAsDefault, true)
+                .configure(KotlinFeature.NullToEmptyCollection, true)
+                .configure(KotlinFeature.NullToEmptyMap, true)
+                .build()
+        )
+
     init {
+
         val httpClient: HttpClient = HttpClient.create().option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000)
             .responseTimeout(Duration.ofMillis(5000)).doOnConnected { conn ->
                 conn.addHandlerLast(ReadTimeoutHandler(5000, TimeUnit.MILLISECONDS))
@@ -48,35 +58,15 @@ class Channel private constructor(
 
         val strategies = ExchangeStrategies.builder().codecs { clientDefaultCodecsConfigurer ->
             clientDefaultCodecsConfigurer.defaultCodecs()
-                .jackson2JsonEncoder(
-                    Jackson2JsonEncoder(
-                        ObjectMapper().registerModule(
-                            KotlinModule.Builder()
-                                .configure(KotlinFeature.NullIsSameAsDefault, true)
-                                .configure(KotlinFeature.NullToEmptyCollection, true)
-                                .configure(KotlinFeature.NullToEmptyMap, true)
-                                .build()
-                        ),
-                        MediaType.APPLICATION_JSON
-                    )
-                )
+                .jackson2JsonEncoder(Jackson2JsonEncoder(objectMapper, MediaType.APPLICATION_JSON))
             clientDefaultCodecsConfigurer.defaultCodecs()
-                .jackson2JsonDecoder(
-                    Jackson2JsonDecoder(
-                        ObjectMapper().registerModule(
-                            KotlinModule.Builder()
-                                .configure(KotlinFeature.NullIsSameAsDefault, true)
-                                .configure(KotlinFeature.NullToEmptyCollection, true)
-                                .configure(KotlinFeature.NullToEmptyMap, true)
-                                .build()
-                        ),
-                        MediaType.APPLICATION_JSON
-                    )
-                )
+                .jackson2JsonDecoder(Jackson2JsonDecoder(objectMapper, MediaType.APPLICATION_JSON))
         }.build()
 
         webClient = WebClient.builder().baseUrl("https://api.channel.io")
             .clientConnector(ReactorClientHttpConnector(httpClient)).exchangeStrategies(strategies).build()
+
+
     }
 
     /**
@@ -89,21 +79,31 @@ class Channel private constructor(
     fun getBots(sinceToBack: LocalDate = LocalDate.now()): List<Bot> {
         val epoch = DateTimeUtil.localDateToUnixMilli(sinceToBack)
 
-        val retrieve = webClient.get().run {
-            this.uri { builder ->
+        val response = webClient.get()
+            .uri { builder ->
                 builder.replacePath("/open/v5/bots")
                     .queryParam("since", epoch)
                     .queryParam("limit", "500")
                     .build()
             }
-            this.accept(MediaType.APPLICATION_JSON)
-            this.acceptCharset(StandardCharsets.UTF_8)
-            this.header("x-access-key", xAccessKey)
-            this.header("x-access-secret", xAccessSecret)
-        }.retrieve()
+            .accept(MediaType.APPLICATION_JSON)
+            .acceptCharset(StandardCharsets.UTF_8)
+            .header("x-access-key", xAccessKey)
+            .header("x-access-secret", xAccessSecret)
+            .retrieve()
+            .toEntity<String>()
+            .onErrorResume(WebClientResponseException::class.java) {
+                Mono.just(ResponseEntity<String>(it.responseBodyAsString, it.headers, it.statusCode))
+            }
+            .block()!!
 
-        val bodyToMono = retrieve.bodyToMono<BotsDto>()
-        return bodyToMono.block()!!.bots!!.map { it.toBot() }.toList()
+        if (response.statusCode.isError) {
+            throw ChannelException(response.body)
+        }
+
+        val body = objectMapper.readValue(response.body, BotsDto::class.java)
+        return body.bots!!.map { bot -> bot.toBot() }.toList()
+//        return response.bots!!.map { bot -> bot.toBot() }.toList()
     }
 
     /**
@@ -114,26 +114,26 @@ class Channel private constructor(
      * @since 0.0.1
      */
     fun saveBot(bot: Bot): Bot {
-        val body = webClient.post().run {
-            this.uri { builder -> builder.replacePath("/open/v5/bots").build() }
-            this.accept(MediaType.APPLICATION_JSON)
-            this.acceptCharset(StandardCharsets.UTF_8)
-            this.header("x-access-key", xAccessKey)
-            this.header("x-access-secret", xAccessSecret)
-            this.bodyValue(BotDto.Bot4SaveDto.of(bot))
-        }.exchangeToMono { response ->
-            if (response.statusCode().is2xxSuccessful) {
-                response.bodyToMono<SingleBotDto>()
-            } else {
-                response.bodyToMono<String>()
-            }
-        }.block()
 
-        if (body is String) {
-            throw RuntimeException(body)
+        val response = webClient.post()
+            .uri { builder -> builder.replacePath("/open/v5/bots").build() }
+            .accept(MediaType.APPLICATION_JSON)
+            .acceptCharset(StandardCharsets.UTF_8)
+            .header("x-access-key", xAccessKey)
+            .header("x-access-secret", xAccessSecret)
+            .bodyValue(BotDto.Bot4SaveDto.of(bot))
+            .retrieve()
+            .toEntity<String>()
+            .onErrorResume(WebClientResponseException::class.java) {
+                Mono.just(ResponseEntity<String>(it.responseBodyAsString, it.headers, it.statusCode))
+            }
+            .block()!!
+
+        if (response.statusCode.isError) {
+            throw ChannelException(response.body)
         }
 
-        body as SingleBotDto
+        val body = objectMapper.readValue(response.body, SingleBotDto::class.java)
         return body.bot!!.toBot()
     }
 
@@ -147,20 +147,23 @@ class Channel private constructor(
             return true
         }
 
-        val block = webClient.delete().run {
-            this.uri { builder ->
+        val response = webClient.delete()
+            .uri { builder ->
                 builder.replacePath("/open/v5/bots/${bot.id}")
                     .build()
             }
-            this.accept(MediaType.APPLICATION_JSON)
-            this.acceptCharset(StandardCharsets.UTF_8)
-            this.header("x-access-key", xAccessKey)
-            this.header("x-access-secret", xAccessSecret)
-        }.exchangeToMono { response ->
-            Mono.just(response.statusCode().is2xxSuccessful)
-        }.block()
+            .accept(MediaType.APPLICATION_JSON)
+            .acceptCharset(StandardCharsets.UTF_8)
+            .header("x-access-key", xAccessKey)
+            .header("x-access-secret", xAccessSecret)
+            .retrieve()
+            .toEntity<String>()
+            .onErrorResume(WebClientResponseException::class.java) {
+                Mono.just(ResponseEntity<String>(it.responseBodyAsString, it.headers, it.statusCode))
+            }
+            .block()!!
 
-        return block ?: false
+        return response.statusCode.is2xxSuccessful
     }
 
     /**
@@ -173,22 +176,30 @@ class Channel private constructor(
     fun getManagerAll(sinceToBack: LocalDate = LocalDate.now()): List<Manager> {
         val epoch = DateTimeUtil.localDateToUnixMilli(sinceToBack)
 
-        val managersDto = webClient.get().run {
-            this.uri { builder ->
+        val response = webClient.get()
+            .uri { builder ->
                 builder.replacePath("/open/v5/managers")
                     .queryParam("since", epoch)
                     .queryParam("limit", "500")
                     .build()
             }
-            this.accept(MediaType.APPLICATION_JSON)
-            this.acceptCharset(StandardCharsets.UTF_8)
-            this.header("x-access-key", xAccessKey)
-            this.header("x-access-secret", xAccessSecret)
-        }.retrieve()
-            .bodyToMono<ManagersDto>()
-            .block()
+            .accept(MediaType.APPLICATION_JSON)
+            .acceptCharset(StandardCharsets.UTF_8)
+            .header("x-access-key", xAccessKey)
+            .header("x-access-secret", xAccessSecret)
+            .retrieve()
+            .toEntity<String>()
+            .onErrorResume(WebClientResponseException::class.java) {
+                Mono.just(ResponseEntity<String>(it.responseBodyAsString, it.headers, it.statusCode))
+            }
+            .block()!!
 
-        return managersDto!!.managers
+        if (response.statusCode.isError) {
+            throw ChannelException(response.body)
+        }
+
+        val body = objectMapper.readValue(response.body, ManagersDto::class.java)
+        return body!!.managers
     }
 
     /**
@@ -198,20 +209,28 @@ class Channel private constructor(
      */
     fun findByManagerId(managerId: Long): Manager {
 
-        val resultDto = webClient.get().run {
-            this.uri { builder ->
+        val response = webClient.get()
+            .uri { builder ->
                 builder.replacePath("/open/v5/managers/${managerId}")
                     .build()
             }
-            this.accept(MediaType.APPLICATION_JSON)
-            this.acceptCharset(StandardCharsets.UTF_8)
-            this.header("x-access-key", xAccessKey)
-            this.header("x-access-secret", xAccessSecret)
-        }.retrieve()
-            .bodyToMono<ManagerSingleDto>()
-            .block()
+            .accept(MediaType.APPLICATION_JSON)
+            .acceptCharset(StandardCharsets.UTF_8)
+            .header("x-access-key", xAccessKey)
+            .header("x-access-secret", xAccessSecret)
+            .retrieve()
+            .toEntity<String>()
+            .onErrorResume(WebClientResponseException::class.java) {
+                Mono.just(ResponseEntity<String>(it.responseBodyAsString, it.headers, it.statusCode))
+            }
+            .block()!!
 
-        return resultDto!!.manager
+        if (response.statusCode.isError) {
+            throw ChannelException(response.body)
+        }
+
+        val body = objectMapper.readValue(response.body, ManagerSingleDto::class.java)
+        return body!!.manager
     }
 
     /**
@@ -222,31 +241,30 @@ class Channel private constructor(
      * @since 0.0.1
      */
     fun sendAnnouncement(manager: Manager, bot: Bot, message: Message): Long {
-        val body = webClient.post().run {
-            this.uri { builder ->
+        val response = webClient.post()
+            .uri { builder ->
                 builder.replacePath("/open/v5/announcements/announce")
                     .queryParam("botName", bot.name)
                     .queryParam("managerIds", manager.id)
                     .build()
             }
-            this.accept(MediaType.APPLICATION_JSON)
-            this.acceptCharset(StandardCharsets.UTF_8)
-            this.header("x-access-key", xAccessKey)
-            this.header("x-access-secret", xAccessSecret)
-            this.bodyValue(message)
-        }.exchangeToMono { response ->
-            if (response.statusCode().is2xxSuccessful) {
-                response.bodyToMono<ResultDto>()
-            } else {
-                response.bodyToMono<String>()
+            .accept(MediaType.APPLICATION_JSON)
+            .acceptCharset(StandardCharsets.UTF_8)
+            .header("x-access-key", xAccessKey)
+            .header("x-access-secret", xAccessSecret)
+            .bodyValue(message)
+            .retrieve()
+            .toEntity<String>()
+            .onErrorResume(WebClientResponseException::class.java) {
+                Mono.just(ResponseEntity<String>(it.responseBodyAsString, it.headers, it.statusCode))
             }
-        }.block()
+            .block()!!
 
-        if (body is String) {
-            throw RuntimeException(body)
+        if (response.statusCode.isError) {
+            throw ChannelException(response.body)
         }
 
-        body as ResultDto
+        val body = objectMapper.readValue(response.body, ResultDto::class.java)
         return body.result
     }
 
@@ -258,30 +276,29 @@ class Channel private constructor(
      * @since 0.0.1
      */
     fun sendAnnouncementAll(bot: Bot, message: Message): Long {
-        val body = webClient.post().run {
-            this.uri { builder ->
+        val response = webClient.post()
+            .uri { builder ->
                 builder.replacePath("/open/v5/announcements/announce/all")
                     .queryParam("botName", bot.name)
                     .build()
             }
-            this.accept(MediaType.APPLICATION_JSON)
-            this.acceptCharset(StandardCharsets.UTF_8)
-            this.header("x-access-key", xAccessKey)
-            this.header("x-access-secret", xAccessSecret)
-            this.bodyValue(message)
-        }.exchangeToMono { response ->
-            if (response.statusCode().is2xxSuccessful) {
-                response.bodyToMono<ResultDto>()
-            } else {
-                response.bodyToMono<String>()
+            .accept(MediaType.APPLICATION_JSON)
+            .acceptCharset(StandardCharsets.UTF_8)
+            .header("x-access-key", xAccessKey)
+            .header("x-access-secret", xAccessSecret)
+            .bodyValue(message)
+            .retrieve()
+            .toEntity<String>()
+            .onErrorResume(WebClientResponseException::class.java) {
+                Mono.just(ResponseEntity<String>(it.responseBodyAsString, it.headers, it.statusCode))
             }
-        }.block()
+            .block()!!
 
-        if (body is String) {
-            throw RuntimeException(body)
+        if (response.statusCode.isError) {
+            throw ChannelException(response.body)
         }
 
-        body as ResultDto
+        val body = objectMapper.readValue(response.body, ResultDto::class.java)
         return body.result
     }
 
@@ -294,22 +311,30 @@ class Channel private constructor(
     fun getTeamChatAll(sinceToBack: LocalDate = LocalDate.now()): List<TeamChat> {
         val epoch = DateTimeUtil.localDateToUnixMilli(sinceToBack)
 
-        val resultDto = webClient.get().run {
-            this.uri { builder ->
+        val response = webClient.get()
+            .uri { builder ->
                 builder.replacePath("/open/v5/groups")
                     .queryParam("since", epoch)
                     .queryParam("limit", "500")
                     .build()
             }
-            this.accept(MediaType.APPLICATION_JSON)
-            this.acceptCharset(StandardCharsets.UTF_8)
-            this.header("x-access-key", xAccessKey)
-            this.header("x-access-secret", xAccessSecret)
-        }.retrieve()
-            .bodyToMono<GroupsDto>()
-            .block()
+            .accept(MediaType.APPLICATION_JSON)
+            .acceptCharset(StandardCharsets.UTF_8)
+            .header("x-access-key", xAccessKey)
+            .header("x-access-secret", xAccessSecret)
+            .retrieve()
+            .toEntity<String>()
+            .onErrorResume(WebClientResponseException::class.java) {
+                Mono.just(ResponseEntity<String>(it.responseBodyAsString, it.headers, it.statusCode))
+            }
+            .block()!!
 
-        return resultDto!!.groups
+        if (response.statusCode.isError) {
+            throw ChannelException(response.body)
+        }
+
+        val body = objectMapper.readValue(response.body, GroupsDto::class.java)
+        return body!!.groups
     }
 
     /**
@@ -329,22 +354,30 @@ class Channel private constructor(
      * @since 0.13.1
      */
     fun sendTeamChat(teamChatId: Long, botName: String, message: Message): Boolean {
-        val result = webClient.post().run {
-            this.uri { builder ->
+        val response = webClient.post()
+            .uri { builder ->
                 builder.replacePath("/open/v5/groups/${teamChatId}/messages")
                     .queryParam("botName", botName)
                     .build()
             }
-            this.accept(MediaType.APPLICATION_JSON)
-            this.acceptCharset(StandardCharsets.UTF_8)
-            this.header("x-access-key", xAccessKey)
-            this.header("x-access-secret", xAccessSecret)
-            this.bodyValue(message)
-        }.exchangeToMono { response ->
-            Mono.just(response.statusCode().is2xxSuccessful)
-        }.block()
+            .accept(MediaType.APPLICATION_JSON)
+            .acceptCharset(StandardCharsets.UTF_8)
+            .header("x-access-key", xAccessKey)
+            .header("x-access-secret", xAccessSecret)
+            .bodyValue(message)
+            .retrieve()
+            .toEntity<String>()
+            .onErrorResume(WebClientResponseException::class.java) {
+                Mono.just(ResponseEntity<String>(it.responseBodyAsString, it.headers, it.statusCode))
+            }
+            .block()!!
 
-        return result!!
+        if (response.statusCode.isError) {
+            throw ChannelException(response.body)
+        }
+
+        return response.statusCode.is2xxSuccessful
+
     }
 
     /**
@@ -356,22 +389,30 @@ class Channel private constructor(
     fun getWebhookAll(sinceToBack: LocalDate = LocalDate.now()): List<Webhook> {
         val epoch = DateTimeUtil.localDateToUnixMilli(sinceToBack)
 
-        val resultDto = webClient.get().run {
-            this.uri { builder ->
+        val response = webClient.get()
+            .uri { builder ->
                 builder.replacePath("/open/v5/webhooks")
                     .queryParam("since", epoch)
                     .queryParam("limit", "500")
                     .build()
             }
-            this.accept(MediaType.APPLICATION_JSON)
-            this.acceptCharset(StandardCharsets.UTF_8)
-            this.header("x-access-key", xAccessKey)
-            this.header("x-access-secret", xAccessSecret)
-        }.retrieve()
-            .bodyToMono<WebhooksDto>()
-            .block()
+            .accept(MediaType.APPLICATION_JSON)
+            .acceptCharset(StandardCharsets.UTF_8)
+            .header("x-access-key", xAccessKey)
+            .header("x-access-secret", xAccessSecret)
+            .retrieve()
+            .toEntity<String>()
+            .onErrorResume(WebClientResponseException::class.java) {
+                Mono.just(ResponseEntity<String>(it.responseBodyAsString, it.headers, it.statusCode))
+            }
+            .block()!!
 
-        return resultDto!!.webhooks
+        if (response.statusCode.isError) {
+            throw ChannelException(response.body)
+        }
+
+        val body = objectMapper.readValue(response.body, WebhooksDto::class.java)
+        return body!!.webhooks
     }
 
     /**
@@ -381,45 +422,60 @@ class Channel private constructor(
      * @since 0.0.1
      */
     fun createWebhook(webhook: Webhook): Boolean {
-        val result = webClient.post().run {
-            this.uri { builder -> builder.replacePath("/open/v5/webhooks").build() }
-            this.accept(MediaType.APPLICATION_JSON)
-            this.acceptCharset(StandardCharsets.UTF_8)
-            this.header("x-access-key", xAccessKey)
-            this.header("x-access-secret", xAccessSecret)
-            this.bodyValue(webhook)
-        }.exchangeToMono { response ->
-            Mono.just(response.statusCode().is2xxSuccessful)
-        }.block()
 
-        return result!!
+        val response = webClient.post()
+            .uri { builder -> builder.replacePath("/open/v5/webhooks").build() }
+            .accept(MediaType.APPLICATION_JSON)
+            .acceptCharset(StandardCharsets.UTF_8)
+            .header("x-access-key", xAccessKey)
+            .header("x-access-secret", xAccessSecret)
+            .bodyValue(webhook)
+            .retrieve()
+            .toEntity<String>()
+            .onErrorResume(WebClientResponseException::class.java) {
+                Mono.just(ResponseEntity<String>(it.responseBodyAsString, it.headers, it.statusCode))
+            }
+            .block()!!
+
+        if (response.statusCode.isError) {
+            throw ChannelException(response.body)
+        }
+
+        return response.statusCode.is2xxSuccessful
     }
 
     /**
-    * Webhook 삭제
-    *
-    * @author sang oh yeh
-    * @since 0.0.1
-    */
+     * Webhook 삭제
+     *
+     * @author sang oh yeh
+     * @since 0.0.1
+     */
     fun deleteWebhook(webhook: Webhook): Any {
         if (webhook.id == 0L) {
             return true
         }
 
-        val block = webClient.delete().run {
-            this.uri { builder ->
+        val response = webClient.delete()
+            .uri { builder ->
                 builder.replacePath("/open/v5/webhooks/${webhook.id}")
                     .build()
             }
-            this.accept(MediaType.APPLICATION_JSON)
-            this.acceptCharset(StandardCharsets.UTF_8)
-            this.header("x-access-key", xAccessKey)
-            this.header("x-access-secret", xAccessSecret)
-        }.exchangeToMono { response ->
-            Mono.just(response.statusCode().is2xxSuccessful)
-        }.block()
+            .accept(MediaType.APPLICATION_JSON)
+            .acceptCharset(StandardCharsets.UTF_8)
+            .header("x-access-key", xAccessKey)
+            .header("x-access-secret", xAccessSecret)
+            .retrieve()
+            .toEntity<String>()
+            .onErrorResume(WebClientResponseException::class.java) {
+                Mono.just(ResponseEntity<String>(it.responseBodyAsString, it.headers, it.statusCode))
+            }
+            .block()!!
 
-        return block ?: false
+        if (response.statusCode.isError) {
+            throw ChannelException(response.body)
+        }
+
+        return response.statusCode.is2xxSuccessful
     }
 
     companion object {
