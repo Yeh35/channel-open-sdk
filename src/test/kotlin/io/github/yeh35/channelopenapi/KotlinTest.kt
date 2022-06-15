@@ -3,6 +3,7 @@ package io.github.yeh35.channelopenapi
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.KotlinFeature
 import com.fasterxml.jackson.module.kotlin.KotlinModule
+import io.github.yeh35.channelopenapi.error.ChannelException
 import io.github.yeh35.channelopenapi.schma.*
 import io.github.yeh35.channelopenapi.schma.Scope.MESSAGE_CREATED_TEAM_CHAT
 import io.github.yeh35.channelopenapi.schma.Scope.MESSAGE_CREATED_USER_CHAT
@@ -10,6 +11,7 @@ import io.github.yeh35.channelopenapi.schma.block.*
 import org.junit.jupiter.api.Test
 import java.awt.Color
 import java.time.LocalDate
+import java.time.LocalDateTime
 import kotlin.streams.toList
 
 class KotlinTest {
@@ -77,7 +79,7 @@ class KotlinTest {
         println(objectMapper.readValue(json, Manager::class.java))
     }
 
-//    @Test
+    @Test
     fun testTest() {
         val xAccessKey = ""
         val xAccessSecret = ""
@@ -103,6 +105,21 @@ class KotlinTest {
         val isSuccess = channel.deleteBot(newBot)
         println("deleteResult : $isSuccess")
 
+        try {
+            val errorBot = Bot.create("new Bot", Color.GREEN)
+            Bot(
+                id = 1234,
+                name = "error",
+                avatarUrl = "",
+                channelId = "",
+                color = Color.GREEN,
+                createdAt = LocalDateTime.now()
+            )
+            channel.deleteBot(errorBot)
+        } catch (e: ChannelException) {
+            e.printStackTrace()
+        }
+
         // 매니저 전부 가져오기
         val managerAll = channel.getManagerAll(sinceToBack)
         println("managerAll : $managerAll")
@@ -122,6 +139,18 @@ class KotlinTest {
                         TextBlock("item 2"),
                         TextBlock("item 3")
                     )
+                )
+            ),
+            buttons = listOf(
+                Button(
+                    title = "참여하기",
+                    colorVariant = Button.Color.GREEN,
+                    url = "http://localhost:8080"
+                ),
+                Button(
+                    title = "다음에 갈께요",
+                    colorVariant = Button.Color.RED,
+                    url = "http://localhost:8080"
                 )
             ),
             options = setOf(MessageOption.ACT_AS_MANAGER)
@@ -145,10 +174,6 @@ class KotlinTest {
         //특정 TeamChat으로 메시지 보내기
         channel.sendTeamChat(teamChat = teamChat, bot = bot, message = message)
 
-        // 등록된 Webhook 가져오기
-        val webhookAll = channel.getWebhookAll()
-        println("webhookAll Size: ${webhookAll.size}")
-
         // Webhook 생성하기
         val webhook = Webhook.create(
             name = "TestCode",
@@ -161,12 +186,38 @@ class KotlinTest {
         val isSave = channel.createWebhook(webhook)
         println("saveResult: $isSave")
 
-        // Webhook 삭제하기
-        val isDelete = channel.deleteWebhook(webhook)
-        println("delete WebHook: $isDelete")
+        Thread.sleep(3000)
 
+        // 등록된 Webhook 가져오기
+        val webhookAll = channel.getWebhookAll()
+        println("webhookAll Size: ${webhookAll.size}")
 
-        val deleteResult = channel.deleteBot(newBot)
-        println("deleteResult : $deleteResult")
+        for (webhook in webhookAll) {
+
+            if (webhook.name == "TestCode") {
+                // Webhook 삭제하기
+                val isDelete = channel.deleteWebhook(webhook)
+                println("delete WebHook: $isDelete")
+            }
+        }
+    }
+
+    @Test
+    fun delete() {
+        val xAccessKey = "62a58d04644cae7732be"
+        val xAccessSecret = "2fa881a786cd3c4e9ac886ee74fb6004"
+        val channel = Channel.create(xAccessKey, xAccessSecret)
+
+        // 등록된 Webhook 가져오기
+        val webhookAll = channel.getWebhookAll()
+        println("webhookAll Size: ${webhookAll.size}")
+
+        for (webhook in webhookAll) {
+            if (webhook.name == "TestCode") {
+                // Webhook 삭제하기
+                val isDelete = channel.deleteWebhook(webhook)
+                println("delete WebHook: $isDelete")
+            }
+        }
     }
 }
