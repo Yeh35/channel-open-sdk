@@ -1,7 +1,7 @@
 # README.md
 
 # [Channel Talk Open API SDK](https://github.com/Yeh35/channel-open-sdk)
-
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 ---
 
 이 프로젝트는 Channel Talk에서 제공하는 [OpenAPI](https://api-doc.channel.io/)를 Java / Kotlin에서 편하게 사용하기 위한 라이브러리입니다.
