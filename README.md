@@ -1,8 +1,8 @@
 # README.md
 
 # [Channel Talk Open API SDK](https://github.com/Yeh35/channel-open-sdk)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 ---
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 이 프로젝트는 Channel Talk에서 제공하는 [OpenAPI](https://api-doc.channel.io/)를 Java / Kotlin에서 편하게 사용하기 위한 라이브러리입니다.
 Channel Open Api version 5를 기준으로 제작되었습니다.
@@ -22,7 +22,7 @@ To use Channel Talk Open Api directly, Open Api's documents lack explanation and
 You must add dependencies to your project to use this library.
 
 <aside>
-📌 [https://repo1.maven.org/maven2/io/github/yeh35/](https://repo1.maven.org/maven2/io/github/yeh35/) 에서 확인 가능합니다.
+📌  https://repo1.maven.org/maven2/io/github/yeh35/ 에서 확인 가능합니다.
 
 </aside>
 
@@ -44,8 +44,8 @@ dependencies {
 ---
 
 <aside>
-📌 새 인증키 얻는 방법이 여기와 다른 경우 **[공식 문서](https://developers.channel.io/docs/openapi-auth)**를 확인해주세요
-If the method of obtaining a new authentication key is different from here, please check the **[official document](https://developers.channel.io/docs/openapi-auth)**
+📌 새 인증키 얻는 방법이 여기와 다른 경우 https://developers.channel.io/docs/openapi-auth 를 확인해주세요
+If the method of obtaining a new authentication key is different from here, please check the https://developers.channel.io/docs/openapi-auth
 
 </aside>
 
