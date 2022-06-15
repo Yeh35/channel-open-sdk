@@ -1,0 +1,15 @@
+ext {
+    PUBLISH_GROUP_ID = 'io.github.yeh35'
+    PUBLISH_VERSION = '0.13.1'
+    PUBLISH_ARTIFACT_ID = 'channel-open-api'
+    PUBLISH_DESCRIPTION = 'Channel Talk Open API SDK'
+    PUBLISH_URL = 'https://github.com/Yeh35/channel-open-sdk'
+    PUBLISH_LICENSE_NAME = 'GNU License'
+    PUBLISH_LICENSE_URL = 'https://github.com/Yeh35/channel-open-sdk/blob/main/LICENSE'
+    PUBLISH_DEVELOPER_ID = 'yeh35'
+    PUBLISH_DEVELOPER_NAME = 'sang oh yeh'
+    PUBLISH_DEVELOPER_EMAIL = 'jaws0910@gmail.com'
+    PUBLISH_SCM_CONNECTION = 'scm:git:github.com/Yeh35/channel-open-sdk.git'
+    PUBLISH_SCM_DEVELOPER_CONNECTION = 'scm:git:ssh://github.com/Yeh35/channel-open-sdk.git'
+    PUBLISH_SCM_URL = 'https://github.com/Yeh35/channel-open-sdk.git'
+}
