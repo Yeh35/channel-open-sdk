@@ -243,7 +243,7 @@ for (webhook in webhookAll) {
 }
 ```
 
-# Issus
+# Issues
 
 ---
 
